@@ -1,0 +1,5 @@
+##env
+env=dev
+
+# MySQL
+mysql.host=cdh03

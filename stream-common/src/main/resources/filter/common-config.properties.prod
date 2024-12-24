@@ -1,0 +1,17 @@
+# MySQL
+mysql.host=cdh03
+mysql.port=3306
+mysql.url=jdbc:mysql://cdh03:3306/gmall2024?useUnicode=true&characterEncoding=utf8&useSSL=false
+mysql.timezone=Asia/Shanghai
+mysql.database=gmall2024
+mysql.databases.conf=gmall2024_config
+mysql.user=root
+mysql.pwd=root
+
+
+# Zookeeper Server
+zookeeper.server.host.list=cdh01:2181,cdh02:2181,cdh03:2181
+
+
+# Hbase
+hbase.namespace=realtime_v2
