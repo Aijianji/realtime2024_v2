@@ -184,6 +184,7 @@ public class HbaseUtils {
     public static void main(String[] args) {
         /**
          * 此方法用来删除hbase里的表
+         * 平时还是注释比较好吧
          */
         HbaseUtils hbaseUtils = new HbaseUtils("cdh01,cdh02,cdh03");
         hbaseUtils.dropHbaseNameSpace("realtime_v2");

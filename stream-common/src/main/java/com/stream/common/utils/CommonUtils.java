@@ -130,4 +130,25 @@ public class CommonUtils {
     public static boolean isProd() {
         return "prod".equals(ConfigUtils.getString("env"));
     }
+
+    public static void printCheckPropEnv(boolean isExit, String... args) {
+        if (args.length == 0) {
+            System.err.println("Error at least one parameter");
+            return;
+        }
+        if (isExit || isIdeaEnv()) {
+            printArgs(args);
+        }
+        if (isExit) {
+            System.exit(1);
+        }
+    }
+
+    private static void printArgs(String ... args){
+        for (String arg : args) {
+            System.err.println(arg);
+        }
+    }
+
+
 }

@@ -2,6 +2,7 @@ package com.dwd;
 
 import com.alibaba.fastjson.JSON;
 import com.alibaba.fastjson.JSONObject;
+import com.retailersv1.func.ProcessSplitStream;
 import com.stream.common.utils.ConfigUtils;
 import com.stream.common.utils.DateFormatUtil;
 import com.stream.common.utils.KafkaUtils;
@@ -13,13 +14,13 @@ import org.apache.flink.api.common.state.ValueStateDescriptor;
 import org.apache.flink.configuration.Configuration;
 import org.apache.flink.connector.kafka.source.KafkaSource;
 import org.apache.flink.connector.kafka.source.enumerator.initializer.OffsetsInitializer;
-import org.apache.flink.streaming.api.datastream.DataStreamSource;
-import org.apache.flink.streaming.api.datastream.KeyedStream;
-import org.apache.flink.streaming.api.datastream.SingleOutputStreamOperator;
+import org.apache.flink.streaming.api.datastream.*;
 import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;
 import org.apache.flink.streaming.api.functions.ProcessFunction;
 import org.apache.flink.util.Collector;
 import org.apache.flink.util.OutputTag;
+
+import java.util.HashMap;
 
 /**
  * @Author yiqun.shi
@@ -27,6 +28,20 @@ import org.apache.flink.util.OutputTag;
  * @description: 写dwdlog的代码
  */
 public class dwdBaseLog {
+
+    private static final String kafka_topic_base_log_data = ConfigUtils.getString("REALTIME.KAFKA.LOG.TOPIC");
+    private static final String kafka_botstrap_servers = ConfigUtils.getString("kafka.bootstrap.servers");
+    private static final String kafka_err_log = ConfigUtils.getString("kafka.err.log");
+    private static final String kafka_start_log = ConfigUtils.getString("kafka.start.log");
+    private static final String kafka_display_log = ConfigUtils.getString("kafka.display.log");
+    private static final String kafka_action_log = ConfigUtils.getString("kafka.action.log");
+    private static final String kafka_page_topic = ConfigUtils.getString("kafka.page.topic");
+    private static final OutputTag<String> errTag = new OutputTag<String>("errTag") {};
+    private static final OutputTag<String> startTag = new OutputTag<String>("startTag") {};
+    private static final OutputTag<String> displayTag = new OutputTag<String>("displayTag") {};
+    private static final OutputTag<String> actionTag = new OutputTag<String>("actionTag") {};
+    private static final HashMap<String, DataStream<String>> collectDsMap = new HashMap<>();
+
     public static void main(String[] args) throws Exception {
 
         StreamExecutionEnvironment env = StreamExecutionEnvironment.getExecutionEnvironment();
@@ -66,7 +81,7 @@ public class dwdBaseLog {
         //新老用户校验
         //先按照设备id进行分组
         KeyedStream<JSONObject, String> keyedStream = chulihouDS.keyBy(x -> x.getJSONObject("common").getString("mid"));
-        //状态编程 rich前缀的方法才有open()、close()方法。里面会有一个上下文context
+        //状态编程 rich前缀的方法才有open()、close()方法。里面会有一个上下文context存储状态信息
         SingleOutputStreamOperator<JSONObject> isNewDS = keyedStream.map(new RichMapFunction<JSONObject, JSONObject>() {
             ValueState<String> lastVisitState;
 
@@ -99,8 +114,8 @@ public class dwdBaseLog {
                     //如果键控状态为null，说明访问的是老访客但本次是该访客的页面日志首次进去程序。当前端新老访客状态标记丢失时，
                     //日志进入程序被判定为新访客，flink程序就可以纠正被误判的访客状态标记，只要将状态中的日期设置为今天之前即可。本程序选择将状态更新为昨日
                     if (StringUtils.isNoneEmpty(lastVisitDate)) {
-                        String yesterDay = DateFormatUtil.tsToDate(ts - 24 * 60 * 60 * 1000);
-                        lastVisitState.update(yesterDay);
+                        String yesterday = DateFormatUtil.tsToDate(ts - 24 * 60 * 60 * 1000);
+                        lastVisitState.update(yesterday);
                     }
                 }
                 return jsonObject;
@@ -111,46 +126,65 @@ public class dwdBaseLog {
 
 
         //最后分流
-        //先整四个测流 页面放主流吧 (五个测流也行)
-        OutputTag<JSONObject> start = new OutputTag<JSONObject>("start") {};
-        OutputTag<JSONObject> actions = new OutputTag<JSONObject>("actions") {};
-        OutputTag<JSONObject> displays = new OutputTag<JSONObject>("displays") {};
-        OutputTag<JSONObject> err = new OutputTag<JSONObject>("err") {};
-
-        SingleOutputStreamOperator<JSONObject> process = isNewDS.process(new ProcessFunction<JSONObject, JSONObject>() {
-            @Override
-            public void processElement(JSONObject jsonObject, ProcessFunction<JSONObject, JSONObject>.Context context, Collector<JSONObject> out) throws Exception {
-                //判断
-                if (jsonObject.containsKey("start")) {
-                    context.output(start, jsonObject);
-                } else if (jsonObject.containsKey("actions")) {
-                    context.output(actions, jsonObject);
-                } else if (jsonObject.containsKey("displays")) {
-                    context.output(displays, jsonObject);
-                } else if (jsonObject.containsKey("err")) {
-                    context.output(err, jsonObject);
-                } else {
-                    out.collect(jsonObject);
-                }
-            }
-        });
-
-        //输出
-//        process.print("主流(页面)");
-//        process.getSideOutput(start).print("启动");
-//        process.getSideOutput(start).print("动作");
-//        process.getSideOutput(start).print("曝光");
-//        process.getSideOutput(start).print("错误");
-
-        //发送至kafka
-//        process.map(x->x.toJSONString()).sinkTo(KafkaUtils.buildKafkaSink(ConfigUtils.getString("kafka.bootstrap.servers"),"dwd_page"));
-//        process.getSideOutput(start).map(x->x.toJSONString()).sinkTo(KafkaUtils.buildKafkaSink(ConfigUtils.getString("kafka.bootstrap.servers"),"dwd_start"));
-//        process.getSideOutput(actions).map(x->x.toJSONString()).sinkTo(KafkaUtils.buildKafkaSink(ConfigUtils.getString("kafka.bootstrap.servers"),"dwd_actions"));
-//        process.getSideOutput(displays).map(x->x.toJSONString()).sinkTo(KafkaUtils.buildKafkaSink(ConfigUtils.getString("kafka.bootstrap.servers"),"dwd_displays"));
-//        process.getSideOutput(err).map(x->x.toJSONString()).sinkTo(KafkaUtils.buildKafkaSink(ConfigUtils.getString("kafka.bootstrap.servers"),"dwd_err"));
+        /**
+         * 从这往下是粘的老师代码
+         */
+        SingleOutputStreamOperator<String> processTagDs = isNewDS.process(new ProcessSplitStream(errTag,startTag,displayTag,actionTag))
+                .uid("flag_stream_process")
+                .name("flag_stream_process");
 
 
+        SideOutputDataStream<String> sideOutputErrDS = processTagDs.getSideOutput(errTag);
+        SideOutputDataStream<String> sideOutputStartDS = processTagDs.getSideOutput(startTag);
+        SideOutputDataStream<String> sideOutputDisplayTagDS = processTagDs.getSideOutput(displayTag);
+        SideOutputDataStream<String> sideOutputActionTagTagDS = processTagDs.getSideOutput(actionTag);
+
+
+        //输出瞅一眼
+//        sideOutputErrDS.print("错误");
+//        sideOutputStartDS.print("启动");
+//        sideOutputDisplayTagDS.print("曝光");
+//        sideOutputActionTagTagDS.print("行动");
+//        processTagDs.print("页面日志");
+
+
+        collectDsMap.put("errTag",sideOutputErrDS);
+        collectDsMap.put("startTag",sideOutputStartDS);
+        collectDsMap.put("displayTag",sideOutputDisplayTagDS);
+        collectDsMap.put("actionTag",sideOutputActionTagTagDS);
+        collectDsMap.put("page",processTagDs);
+
+
+        SplitDs2kafkaTopicMsg(collectDsMap);
+
+
+        //这行代码就是为了告诉程序将算子链打散，保证一个算子运行完成后再运行下一个算子
+//        env.disableOperatorChaining();
 
         env.execute();
     }
+
+    public static void SplitDs2kafkaTopicMsg(HashMap<String,DataStream<String>> dataStreamHashMap){
+
+        dataStreamHashMap.get("errTag").sinkTo(KafkaUtils.buildKafkaSink(kafka_botstrap_servers,kafka_err_log))
+                .uid("sk_errMsg2Kafka")
+                .name("sk_errMsg2Kafka");
+
+        dataStreamHashMap.get("startTag").sinkTo(KafkaUtils.buildKafkaSink(kafka_botstrap_servers,kafka_start_log))
+                .uid("sk_startMsg2Kafka")
+                .name("sk_startMsg2Kafka");
+
+        dataStreamHashMap.get("displayTag").sinkTo(KafkaUtils.buildKafkaSink(kafka_botstrap_servers,kafka_display_log))
+                .uid("sk_displayMsg2Kafka")
+                .name("sk_displayMsg2Kafka");
+
+        dataStreamHashMap.get("actionTag").sinkTo(KafkaUtils.buildKafkaSink(kafka_botstrap_servers,kafka_action_log))
+                .uid("sk_actionMsg2Kafka")
+                .name("sk_actionMsg2Kafka");
+
+        dataStreamHashMap.get("page").sinkTo(KafkaUtils.buildKafkaSink(kafka_botstrap_servers,kafka_page_topic))
+                .uid("sk_pageMsg2Kafka")
+                .name("sk_pageMsg2Kafka");
+    }
+
 }
