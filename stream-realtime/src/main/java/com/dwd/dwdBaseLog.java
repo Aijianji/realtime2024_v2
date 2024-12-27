@@ -5,6 +5,7 @@ import com.alibaba.fastjson.JSONObject;
 import com.retailersv1.func.ProcessSplitStream;
 import com.stream.common.utils.ConfigUtils;
 import com.stream.common.utils.DateFormatUtil;
+import com.stream.common.utils.EnvironmentSettingUtils;
 import com.stream.common.utils.KafkaUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.flink.api.common.eventtime.WatermarkStrategy;
@@ -45,7 +46,7 @@ public class dwdBaseLog {
     public static void main(String[] args) throws Exception {
 
         StreamExecutionEnvironment env = StreamExecutionEnvironment.getExecutionEnvironment();
-        env.setParallelism(1);
+        EnvironmentSettingUtils.defaultParameter(env);
 
         KafkaSource<String> kafkaSource = KafkaUtils.buildKafkaSource(ConfigUtils.getString("kafka.bootstrap.servers"),
                 ConfigUtils.getString("REALTIME.KAFKA.LOG.TOPIC"),
