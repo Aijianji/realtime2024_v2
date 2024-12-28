@@ -6,6 +6,7 @@ import com.retailersv1.func.ProcessSpiltStreamToHBaseDim;
 import com.stream.common.utils.ConfigUtils;
 import com.stream.common.utils.EnvironmentSettingUtils;
 import com.retailersv1.func.MapUpdateHbaseDimTableFunc;
+import com.stream.common.utils.KafkaUtils;
 import com.stream.utils.CdcSourceUtils;
 import com.ververica.cdc.connectors.mysql.source.MySqlSource;
 import com.ververica.cdc.connectors.mysql.table.StartupOptions;
@@ -108,9 +109,11 @@ public class DbusCdc2KafkaTopic {
         connectDs.process(new ProcessSpiltStreamToHBaseDim(mapStageDesc));
 
 
-
+        /*
+        运行下面的话就会就会生成top_db并存入数据
+         */
 //        cdcDbMainStream.sinkTo(
-//                KafkaUtils.buildKafkaSink(ConfigUtils.getString("kafka.bootstrap.servers"),"realtime_v1_mysql_db")
+//                KafkaUtils.buildKafkaSink(ConfigUtils.getString("kafka.bootstrap.servers"),"topic_db")
 //        ).uid("sink_to_kafka_realtime_v1_mysql_db").name("sink_to_kafka_realtime_v1_mysql_db");
 
         env.execute();

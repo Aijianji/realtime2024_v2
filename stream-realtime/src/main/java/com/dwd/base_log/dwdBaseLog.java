@@ -1,4 +1,4 @@
-package com.dwd;
+package com.dwd.base_log;
 
 import com.alibaba.fastjson.JSON;
 import com.alibaba.fastjson.JSONObject;

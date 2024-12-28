@@ -29,6 +29,7 @@ import java.util.Collections;
  * @Author yiqun.shi
  * @Date 2024/12/26 20:53
  * @description: 这个代码是可以将jar包在本地上传部署至yarn的，就不用再把jar包放到终端里,然后去flink用./bin/...那个命令运行部署了。所以这些代码和次项目无关
+ *               未测试
  */
 public class FlinkJobSubmitToYarnApplicationModel {
     private static final Logger LOG = LoggerFactory.getLogger(FlinkJobSubmitToYarnApplicationModel.class.getName());

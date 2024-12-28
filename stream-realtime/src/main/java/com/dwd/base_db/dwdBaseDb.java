@@ -1,4 +1,4 @@
-package com.dwd;
+package com.dwd.base_db;
 
 import com.alibaba.fastjson.JSONObject;
 import com.retailersv1.func.ProcessDwdFunction;
