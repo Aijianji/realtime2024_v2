@@ -1,3 +1,5 @@
+# env
+env=prod
 # MySQL
 mysql.host=cdh03
 mysql.port=3306
@@ -20,6 +22,8 @@ kafka.display.log=dwd_display_log
 kafka.action.log=dwd_action_log
 kafka.page.topic=dwd_page_topic
 
+kafka.topic.dwd.trade.cart.add=dwd_trade_cart_add
+
 
 # Zookeeper Server
 zookeeper.server.host.list=cdh01:2181,cdh02:2181,cdh03:2181
@@ -33,3 +37,6 @@ hbase.namespace=realtime_v2
 flink.submit.user=root
 flink.conf.configurationDirectory=
 flink.cluster.libs=/flink-jars/lib
+
+
+# hive(catalog)
